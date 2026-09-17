@@ -42,6 +42,7 @@ import it.niedermann.owncloud.notes.databinding.FragmentNoteEditBinding;
 import it.niedermann.owncloud.notes.persistence.entity.Note;
 import it.niedermann.owncloud.notes.shared.model.ISyncCallback;
 import it.niedermann.owncloud.notes.shared.util.DisplayUtils;
+import it.niedermann.owncloud.notes.shared.util.WikiLinkUnescaper;
 import kotlin.Unit;
 
 public class NoteEditFragment extends SearchableBaseNoteFragment {
@@ -202,7 +203,7 @@ public class NoteEditFragment extends SearchableBaseNoteFragment {
 
         lifecycleScopeIOJob(() -> {
             // load potential big note on IO Dispatchers
-            final String content = note.getContent();
+            final String content = WikiLinkUnescaper.unescape(note.getContent());
             final var sp = PreferenceManager.getDefaultSharedPreferences(requireContext().getApplicationContext());
 
             onMainThread(() -> {

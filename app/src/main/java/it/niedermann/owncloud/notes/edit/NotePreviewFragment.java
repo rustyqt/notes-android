@@ -26,6 +26,7 @@ import android.widget.Toast;
 import androidx.annotation.ColorInt;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.lifecycle.Lifecycle;
 import androidx.preference.PreferenceManager;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout.OnRefreshListener;
 
@@ -39,6 +40,9 @@ import it.niedermann.owncloud.notes.branding.BrandingUtil;
 import it.niedermann.owncloud.notes.databinding.FragmentNotePreviewBinding;
 import it.niedermann.owncloud.notes.persistence.entity.Note;
 import it.niedermann.owncloud.notes.shared.util.SSOUtil;
+import it.niedermann.owncloud.notes.shared.util.WikiLinkUnescaper;
+import it.niedermann.owncloud.notes.shoppinglist.ShoppingListMenuProvider;
+import it.niedermann.owncloud.notes.shoppinglist.ShoppingListSorter;
 import kotlin.Unit;
 
 public class NotePreviewFragment extends SearchableBaseNoteFragment implements OnRefreshListener {
@@ -135,6 +139,12 @@ public class NotePreviewFragment extends SearchableBaseNoteFragment implements O
         if (sp.getBoolean(getString(R.string.pref_key_font), false)) {
             binding.singleNoteContent.setTypeface(Typeface.MONOSPACE);
         }
+
+        if (binding.singleNoteContent.isEnabled()) {
+            final var shoppingListMenu = new ShoppingListMenuProvider(
+                    requireActivity(), () -> changedText, binding.singleNoteContent::setMarkdownString);
+            requireActivity().addMenuProvider(shoppingListMenu, getViewLifecycleOwner(), Lifecycle.State.RESUMED);
+        }
     }
 
     @Override
@@ -150,7 +160,7 @@ public class NotePreviewFragment extends SearchableBaseNoteFragment implements O
         registerInternalNoteTextChangedHandler();
 
         lifecycleScopeIOJob(() -> {
-            final String content = note.getContent();
+            final String content = WikiLinkUnescaper.unescape(note.getContent());
             changedText = content;
 
             onMainThread(() -> {
@@ -162,7 +172,12 @@ public class NotePreviewFragment extends SearchableBaseNoteFragment implements O
                 }
 
                 binding.singleNoteContent.getMarkdownString().observe(activity, (newContent) -> {
-                    changedText = newContent.toString();
+                    final String sortedContent = ShoppingListSorter.sortIfEnabled(newContent.toString());
+                    if (!sortedContent.contentEquals(newContent)) {
+                        binding.singleNoteContent.setMarkdownString(sortedContent);
+                        return;
+                    }
+                    changedText = sortedContent;
                     saveNote(null);
                 });
                 return Unit.INSTANCE;

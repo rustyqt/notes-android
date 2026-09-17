@@ -33,6 +33,9 @@
     <string name="menu_preview">Preview</string>
     <string name="menu_share">Share</string>
     <string name="menu_shared_note">Shared note</string>
+    <string name="menu_shopping_list">Shopping list</string>
+    <string name="shopping_list_open">Open</string>
+    <string name="shopping_list_done">Done</string>
     <string name="common_loading">Loading…</string>
 
 

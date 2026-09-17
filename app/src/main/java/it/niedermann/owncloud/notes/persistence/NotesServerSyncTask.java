@@ -249,6 +249,7 @@ abstract class NotesServerSyncTask extends Thread {
                     repo.addNote(localAccount.getId(), remoteNote);
                 }
             }
+            PulledNoteWikiLinkRepair.repair(repo, localAccount, remoteNotes);
             Log.d(TAG, "   Remove remotely deleted Notes (only those without local changes)");
             // remove remotely deleted notes (only those without local changes)
             for (final var entry : idMap.entrySet()) {
