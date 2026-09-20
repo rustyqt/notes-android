@@ -12,6 +12,8 @@ import static it.niedermann.owncloud.notes.shared.util.NoteUtil.getFontSizeFromP
 import android.content.Intent;
 import android.graphics.Typeface;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.Layout;
 import android.text.method.LinkMovementMethod;
 import android.util.Log;
@@ -60,6 +62,14 @@ public class NotePreviewFragment extends SearchableBaseNoteFragment implements O
 
     private long lastTextChange = 0;
 
+    /**
+     * How long a ticked checkbox stays visible before its entry moves to the other section.
+     */
+    private static final long SHOPPING_LIST_SORT_DELAY_MS = 200;
+
+    private final Handler shoppingListSortHandler = new Handler(Looper.getMainLooper());
+    private Runnable pendingShoppingListSort;
+
     @Override
     public void onPrepareOptionsMenu(@NonNull Menu menu) {
         super.onPrepareOptionsMenu(menu);
@@ -85,6 +95,45 @@ public class NotePreviewFragment extends SearchableBaseNoteFragment implements O
             }
             setScrollY = null;
         };
+    }
+
+    /**
+     * Sorts the shopping list shortly after a checkbox has been ticked.
+     * <p>
+     * A second tap within the delay restarts it, so ticking several entries in a row sorts once.
+     * The sorted text is computed when the delay is over rather than when it starts, because a
+     * result computed earlier would no longer know about the entries ticked since.
+     */
+    private void scheduleShoppingListSort() {
+        cancelShoppingListSort();
+        pendingShoppingListSort = () -> {
+            pendingShoppingListSort = null;
+            if (binding == null) {
+                return;
+            }
+            final var currentContent = binding.singleNoteContent.getMarkdownString().getValue();
+            if (currentContent == null) {
+                return;
+            }
+            final String sortedContent = ShoppingListSorter.sortIfEnabled(currentContent.toString());
+            if (!sortedContent.contentEquals(currentContent)) {
+                binding.singleNoteContent.setMarkdownString(sortedContent);
+            }
+        };
+        shoppingListSortHandler.postDelayed(pendingShoppingListSort, SHOPPING_LIST_SORT_DELAY_MS);
+    }
+
+    private void cancelShoppingListSort() {
+        if (pendingShoppingListSort != null) {
+            shoppingListSortHandler.removeCallbacks(pendingShoppingListSort);
+            pendingShoppingListSort = null;
+        }
+    }
+
+    @Override
+    public void onDestroyView() {
+        cancelShoppingListSort();
+        super.onDestroyView();
     }
 
     @Override
@@ -174,7 +223,11 @@ public class NotePreviewFragment extends SearchableBaseNoteFragment implements O
                 binding.singleNoteContent.getMarkdownString().observe(activity, (newContent) -> {
                     final String sortedContent = ShoppingListSorter.sortIfEnabled(newContent.toString());
                     if (!sortedContent.contentEquals(newContent)) {
-                        binding.singleNoteContent.setMarkdownString(sortedContent);
+                        // The checkmark should be seen before the entry moves away. The note keeps
+                        // the ticked state meanwhile, so leaving the preview within the delay loses
+                        // nothing: it is sorted the next time it is opened.
+                        changedText = newContent.toString();
+                        scheduleShoppingListSort();
                         return;
                     }
                     changedText = sortedContent;
